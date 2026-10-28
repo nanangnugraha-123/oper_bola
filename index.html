@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Oper Bola Cepat! - Estafet Bola Melingkar</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts: Fredoka & Nunito untuk tampilan ceria ramah anak -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Fredoka', cursive, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-nunito {
+            font-family: 'Nunito', sans-serif;
+        }
+        /* Custom Animations */
+        @keyframes pulse-slow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 2s infinite ease-in-out;
+        }
+        @keyframes bounce-ball {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-ball {
+            animation: bounce-ball 0.6s infinite ease-in-out;
+        }
+        /* Glassmorphic Cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 4px solid #FCD34D;
+        }
+    </style>
+</head>
+<body class="bg-emerald-600 text-slate-800 min-h-screen flex flex-col justify-between overflow-hidden">
+
+    <!-- TOP HEADER / HUD BOARD -->
+    <header class="w-full bg-emerald-800/80 backdrop-blur-md text-white p-3 shadow-lg border-b-4 border-emerald-900 z-10 flex justify-between items-center max-w-2xl mx-auto rounded-b-2xl">
+        <!-- Heart / Lives -->
+        <div class="flex items-center space-x-1 bg-emerald-900/60 px-3 py-1.5 rounded-full border border-emerald-700">
+            <span class="text-xs uppercase tracking-wider text-emerald-200 font-bold hidden sm:inline">Nyawa:</span>
+            <div id="lives-container" class="flex space-x-1 text-xl sm:text-2xl">
+                <span>❤️</span><span>❤️</span><span>❤️</span>
+            </div>
+        </div>
+
+        <!-- Level / Speed Indicator -->
+        <div class="text-center">
+            <div class="text-xs text-yellow-300 font-bold tracking-wider">PUTARAN</div>
+            <div id="lap-count" class="text-xl sm:text-2xl font-black text-white">1</div>
+        </div>
+
+        <!-- Score -->
+        <div class="flex items-center space-x-2 bg-yellow-400 text-emerald-950 px-4 py-1.5 rounded-full font-extrabold text-lg sm:text-xl shadow-md border-2 border-yellow-200">
+            <span>⭐</span>
+            <span id="score">0</span>
+        </div>
+    </header>
+
+    <!-- MAIN GAME FIELD (CANVAS CONTAINER) -->
+    <main class="relative flex-1 w-full max-w-md mx-auto flex items-center justify-center p-2 my-auto">
+        
+        <!-- Game Canvas Screen -->
+        <div class="relative w-full aspect-square max-w-[360px] max-h-[360px] sm:max-w-[420px] sm:max-h-[420px] rounded-full border-8 border-emerald-400/50 shadow-2xl bg-gradient-to-b from-emerald-500 to-green-600 flex items-center justify-center overflow-hidden">
+            <!-- Grass Pattern Detail -->
+            <div class="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+            
+            <!-- Pitch Circle Marker -->
+            <div class="absolute w-[72%] h-[72%] rounded-full border-4 border-dashed border-white/40 flex items-center justify-center">
+                <div class="text-center opacity-30 text-white font-black text-xs sm:text-sm tracking-widest uppercase">
+                    ESTAFET LINGKARAN
+                </div>
+            </div>
+
+            <!-- HTML/JS Canvas Layer for Ball and Kids -->
+            <canvas id="gameCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
+        </div>
+
+        <!-- OVERLAY: START / WELCOME SCREEN -->
+        <div id="start-modal" class="absolute inset-2 sm:inset-4 glass-card rounded-3xl p-5 flex flex-col justify-between items-center text-center z-30 shadow-2xl">
+            <div class="space-y-2 mt-2">
+                <span class="text-4xl sm:text-5xl animate-bounce-ball inline-block">⚽</span>
+                <h1 class="text-2xl sm:text-3xl font-black text-emerald-700 leading-tight">
+                    OPER BOLA CEPAT!
+                </h1>
+                <p class="text-xs sm:text-sm font-nunito font-bold text-slate-600 px-2">
+                    Estafet Bola Melingkar - PJOK Kelas 3 SD
+                </p>
+            </div>
+
+            <div class="bg-amber-100/80 p-3.5 rounded-2xl border-2 border-amber-300 text-left text-xs sm:text-sm text-amber-900 space-y-1.5 font-nunito my-auto">
+                <div class="font-bold text-amber-950 flex items-center gap-1">
+                    <span>💡</span> Cara Bermain:
+                </div>
+                <ul class="list-disc list-inside space-y-1">
+                    <li>Bola akan berputar mengelilingi 5 anak.</li>
+                    <li>Jawab pertanyaan sebelum <b>waktu habis</b>!</li>
+                    <li>Jawaban benar = Bola operan makin cepat!</li>
+                    <li>Jangan sampai bola jatuh 3 kali ya!</li>
+                </ul>
+            </div>
+
+            <button onclick="startGame()" class="w-full py-3.5 sm:py-4 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-emerald-950 font-black text-lg sm:text-xl rounded-2xl shadow-lg border-b-4 border-amber-700 active:translate-y-1 transition transform animate-pulse-slow">
+                🚀 MULAI MAIN!
+            </button>
+        </div>
+
+        <!-- OVERLAY: QUESTION CARD MODAL -->
+        <div id="quiz-modal" class="hidden absolute inset-2 sm:inset-4 glass-card rounded-3xl p-4 sm:p-5 flex-col justify-between items-center text-center z-20 shadow-2xl">
+            <!-- Timer Countdown Bar -->
+            <div class="w-full bg-slate-200 h-3.5 rounded-full overflow-hidden border-2 border-slate-300">
+                <div id="timer-bar" class="bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 h-full w-full transition-all duration-100 ease-linear"></div>
+            </div>
+
+            <!-- Quiz Header Info -->
+            <div class="w-full flex justify-between items-center text-xs font-bold text-slate-500">
+                <span id="quiz-giver" class="text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">👦 Budi Oper Bola...</span>
+                <span id="timer-text" class="text-amber-600 font-extrabold text-sm">⏱️ 6s</span>
+            </div>
+
+            <!-- Question Text -->
+            <div class="my-auto py-2">
+                <h2 id="question-text" class="text-sm sm:text-base font-extrabold text-slate-800 leading-snug font-nunito">
+                    Pertanyaan akan muncul di sini?
+                </h2>
+            </div>
+
+            <!-- Multiple Choice Buttons Container -->
+            <div id="options-container" class="w-full space-y-2">
+                <!-- Buttons dynamically generated by JS -->
+            </div>
+        </div>
+
+        <!-- OVERLAY: FEEDBACK RESULT MODAL (Correct / Wrong Explanation) -->
+        <div id="feedback-modal" class="hidden absolute inset-2 sm:inset-4 glass-card rounded-3xl p-5 flex-col justify-between items-center text-center z-30 shadow-2xl">
+            <div id="feedback-icon" class="text-5xl my-2">🎉</div>
+            <h3 id="feedback-title" class="text-xl sm:text-2xl font-black">HEBAT! BENAR!</h3>
+            
+            <div id="feedback-body" class="bg-blue-50 border-2 border-blue-200 p-3.5 rounded-2xl text-xs sm:text-sm text-slate-700 font-nunito my-auto text-center leading-relaxed">
+                Penjelasan interaktif ramah anak akan muncul di sini.
+            </div>
+
+            <button id="next-btn" onclick="continueGame()" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-base sm:text-lg rounded-xl shadow-md border-b-4 border-emerald-700 active:translate-y-1 transition">
+                OPER BOLA LAGI ⚽➡️
+            </button>
+        </div>
+
+        <!-- OVERLAY: GAME OVER MODAL -->
+        <div id="gameover-modal" class="hidden absolute inset-2 sm:inset-4 glass-card rounded-3xl p-5 flex-col justify-between items-center text-center z-40 shadow-2xl">
+            <div class="space-y-1">
+                <span class="text-5xl">🏆</span>
+                <h2 class="text-2xl sm:text-3xl font-black text-amber-600">PERMAINAN SELESAI!</h2>
+                <p class="text-xs text-slate-500 font-nunito font-bold">Kamu sudah berusaha dengan sangat baik!</p>
+            </div>
+
+            <div class="bg-yellow-50 border-2 border-yellow-200 p-4 rounded-2xl w-full my-auto space-y-2">
+                <div class="text-xs text-slate-600 uppercase font-bold">Skor Akhir Kamu</div>
+                <div id="final-score" class="text-4xl font-black text-emerald-600">0</div>
+                <div id="final-lap" class="text-xs text-slate-500 font-bold">Berhasil melakukan <span class="text-amber-600">0</span> putaran bola!</div>
+            </div>
+
+            <button onclick="restartGame()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-lg rounded-2xl shadow-lg border-b-4 border-emerald-800 active:translate-y-1 transition">
+                🔄 MAIN LAGI
+            </button>
+        </div>
+    </main>
+
+    <!-- FOOTER INFO -->
+    <footer class="w-full text-center py-2 bg-emerald-900/40 text-emerald-100 text-[11px] font-nunito">
+        Media Pembelajaran PJOK Interaktif Kelas 3 SD - Tema: Estafet Bola Melingkar
+    </footer>
+
+    <!-- GAME LOGIC JAVASCRIPT -->
+    <script>
+        /* ----------------------------------------------------
+           QUIZ DATASET: PJOK KELAS 3 SD (ESTAFET BOLA MELINGKAR)
+        ---------------------------------------------------- */
+        const quizBank = [
+            {
+                q: "Bagaimana cara memegang bola saat estafet bola melingkar?",
+                options: [
+                    "Pegang erat dengan dua tangan",
+                    "Dilempar setinggi mungkin",
+                    "Ditendang pakai kaki kiri",
+                    "Dibiarkan menggelinding sendiri"
+                ],
+                answer: 0,
+                explain: "Peganglah bola erat-erat dengan kedua tangan agar bola tidak mudah terjatuh saat dioper!"
+            },
+            {
+                q: "Ke arah mana saja bola estafet melingkar bisa dioper?",
+                options: [
+                    "Hanya ke atas langit",
+                    "Searah atau berlawanan jarum jam",
+                    "Langsung dilempar keluar lapangan",
+                    "Hanya ke arah penonton"
+                ],
+                answer: 1,
+                explain: "Operan estafet melingkar dilakukan secara berurutan, bisa searah jarum jam (ke kanan) atau berlawanan jarum jam (ke kiri)."
+            },
+            {
+                q: "Apa tujuan utama dari permainan estafet bola melingkar?",
+                options: [
+                    "Bermain sendiri-sendiri",
+                    "Melatih kerja sama dan kecepatan tim",
+                    "Merebut bola dari teman",
+                    "Menjatuhkan bola sebanyak-banyaknya"
+                ],
+                answer: 1,
+                explain: "Estafet adalah permainan beregu! Tujuannya melatih kekompakan, kerja sama, dan kecepatan tim."
+            },
+            {
+                q: "Apa yang harus dilakukan saat menunggu operan bola dari teman?",
+                options: [
+                    "Duduk sambil tidur",
+                    "Fokus dan siap menerima bola dengan dua tangan",
+                    "Berlari meninggalkan posisi",
+                    "Bermain HP sendiri"
+                ],
+                answer: 1,
+                explain: "Kita harus tetap pandang bola, fokus, dan siap menerima agar operan berjalan lancar!"
+            },
+            {
+                q: "Jika teman mempassing bola ke kamu, sikap badan yang benar adalah...",
+                options: [
+                    "Membelakangi teman",
+                    "Menghadap teman yang memberikan bola",
+                    "Menutup mata rapat-rapat",
+                    "Melipat kedua tangan di belakang"
+                ],
+                answer: 1,
+                explain: "Badan dan pandangan mata harus menghadap ke arah datangnya bola dari teman."
+            },
+            {
+                q: "Mengapa kita tidak boleh mendorong teman saat estafet bola?",
+                options: [
+                    "Supaya tidak ada yang cedera / jatuh",
+                    "Agar bola makin cepat",
+                    "Karena disuruh guru saja",
+                    "Agar permainan makin ramai"
+                ],
+                answer: 0,
+                explain: "Menjaga keselamatan adalah yang utama! Selalu utamakan sikap sportif dan saling menjaga teman."
+            },
+            {
+                q: "Sebelum melakukan permainan estafet bola di lapangan, kita harus...",
+                options: [
+                    "Langsung tidur di rumput",
+                    "Melakukan pemanasan otot",
+                    "Makan makanan yang sangat pedas",
+                    "Berlari tanpa henti sampai lelah"
+                ],
+                answer: 1,
+                explain: "Pemanasan sangat penting sebelum berolahraga agar otot siap dan terhindar dari cedera."
+            },
+            {
+                q: "Sikap yang baik jika tim kita kalah dalam permainan estafet adalah...",
+                options: [
+                    "Marah-marah kepada teman",
+                    "Menangis keras-keras",
+                    "Tetap tersenyum, sportif, dan menyelamati pemenang",
+                    "Merusak bola permainan"
+                ],
+                answer: 2,
+                explain: "Anak hebat selalu memiliki sikap sportif! Menang atau kalah tetap saling mendukung dan lapang dada."
+            }
+        ];
+
+        /* ----------------------------------------------------
+           KIDS CHARACTERS DATA
+        ---------------------------------------------------- */
+        const kids = [
+            { name: "Budi", color: "#EF4444", shirt: "👕 Red", avatar: "👦🏻" },
+            { name: "Siti", color: "#F59E0B", shirt: "👗 Yellow", avatar: "👧🏽" },
+            { name: "Eko", color: "#10B981", shirt: "👕 Green", avatar: "👦🏽" },
+            { name: "Lani", color: "#3B82F6", shirt: "👗 Blue", avatar: "👧🏻" },
+            { name: "Deni", color: "#8B5CF6", shirt: "👕 Purple", avatar: "👦🏼" }
+        ];
+
+        /* ----------------------------------------------------
+           GAME STATE & AUDIO SYNTHESIZER (WEB AUDIO API)
+        ---------------------------------------------------- */
+        let score = 0;
+        let lives = 3;
+        let currentLap = 1;
+        let currentKidIndex = 0;
+        let targetKidIndex = 1;
+        let ballProgress = 0; // 0 to 1
+        let isPassing = false;
+        let passSpeed = 0.02; // Dynamic speed multiplier
+        let quizTimer = null;
+        let timeLeft = 6;
+        let activeQuestion = null;
+        let usedQuestions = [];
+
+        // Simple Web Audio API Sound Generator (No external assets required)
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playSound(type) {
+            try {
+                if (!audioCtx) audioCtx = new AudioCtx();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'pass') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'correct') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(250, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch (e) {
+                console.log("Audio not supported or blocked");
+            }
+        }
+
+        /* ----------------------------------------------------
+           CANVAS & GRAPHICS RENDERING
+        ---------------------------------------------------- */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function getKidPosition(index, total = 5) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = canvas.width * 0.34;
+            // Angle offsetting to place Kid 0 top-center
+            const angle = (index * (2 * Math.PI / total)) - (Math.PI / 2);
+            return {
+                x: centerX + radius * Math.cos(angle),
+                y: centerY + radius * Math.sin(angle)
+            };
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const numKids = kids.length;
+
+            // Draw Connection Lines between kids
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < numKids; i++) {
+                const pos = getKidPosition(i, numKids);
+                if (i === 0) ctx.moveTo(pos.x, pos.y);
+                else ctx.lineTo(pos.x, pos.y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // Draw Kids Characters
+            for (let i = 0; i < numKids; i++) {
+                const pos = getKidPosition(i, numKids);
+                const kid = kids[i];
+
+                // Outer Ring Highlight for Active Target
+                if (i === currentKidIndex) {
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 24, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(253, 224, 71, 0.4)';
+                    ctx.fill();
+                }
+
+                // Kid Base Body Circle
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 18, 0, Math.PI * 2);
+                ctx.fillStyle = kid.color;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.stroke();
+
+                // Kid Avatar Emoji / Icon
+                ctx.font = '18px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(kid.avatar, pos.x, pos.y);
+
+                // Kid Name Tag
+                ctx.font = 'bold 11px Fredoka, sans-serif';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(kid.name, pos.x, pos.y + 28);
+                ctx.shadowBlur = 0; // reset
+            }
+
+            // Draw Soccer Ball
+            let ballX, ballY;
+            const startPos = getKidPosition(currentKidIndex, numKids);
+            const endPos = getKidPosition(targetKidIndex, numKids);
+
+            if (isPassing) {
+                // Curved Path Calculation for smooth relay feel
+                ballX = startPos.x + (endPos.x - startPos.x) * ballProgress;
+                ballY = startPos.y + (endPos.y - startPos.y) * ballProgress;
+                // Add slight arc height
+                const arcHeight = Math.sin(ballProgress * Math.PI) * -15;
+                ballY += arcHeight;
+            } else {
+                ballX = startPos.x;
+                ballY = startPos.y;
+            }
+
+            // Ball Shadow
+            ctx.beginPath();
+            ctx.ellipse(ballX, ballY + 12, 10, 4, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.fill();
+
+            // Ball Emoji / Vector Graphic
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚽', ballX, ballY);
+        }
+
+        function gameLoop() {
+            if (isPassing) {
+                ballProgress += passSpeed;
+                if (ballProgress >= 1) {
+                    ballProgress = 0;
+                    isPassing = false;
+                    currentKidIndex = targetKidIndex;
+                    targetKidIndex = (currentKidIndex + 1) % kids.length;
+
+                    // Increase lap on full circle loop
+                    if (currentKidIndex === 0) {
+                        currentLap++;
+                        document.getElementById('lap-count').textContent = currentLap;
+                        // Speed up slightly as lap progresses
+                        passSpeed = Math.min(0.04, passSpeed + 0.003);
+                    }
+
+                    // Trigger Quiz Prompt on Arrival
+                    triggerQuizModal();
+                }
+            }
+
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* ----------------------------------------------------
+           GAME ENGINE CONTROL & QUIZ LOGIC
+        ---------------------------------------------------- */
+        function startGame() {
+            score = 0;
+            lives = 3;
+            currentLap = 1;
+            currentKidIndex = 0;
+            targetKidIndex = 1;
+            passSpeed = 0.02;
+            usedQuestions = [];
+
+            updateHUD();
+            document.getElementById('start-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            
+            // Initial animation pulse sound
+            playSound('pass');
+            // Trigger first quiz after slight delay
+            setTimeout(() => {
+                triggerQuizModal();
+            }, 600);
+        }
+
+        function updateHUD() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lap-count').textContent = currentLap;
+
+            // Render Heart Lives
+            let heartsHTML = '';
+            for (let i = 0; i < 3; i++) {
+                if (i < lives) {
+                    heartsHTML += '<span>❤️</span>';
+                } else {
+                    heartsHTML += '<span class="opacity-30 grayscale">💔</span>';
+                }
+            }
+            document.getElementById('lives-container').innerHTML = heartsHTML;
+        }
+
+        function getRandomQuestion() {
+            if (usedQuestions.length === quizBank.length) {
+                usedQuestions = []; // Reset pool if all used
+            }
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * quizBank.length);
+            } while (usedQuestions.includes(randomIndex));
+
+            usedQuestions.push(randomIndex);
+            return quizBank[randomIndex];
+        }
+
+        function triggerQuizModal() {
+            activeQuestion = getRandomQuestion();
+            const giverName = kids[currentKidIndex].name;
+            const receiverName = kids[targetKidIndex].name;
+
+            document.getElementById('quiz-giver').textContent = `⚽ Operan ${giverName} ➔ ${receiverName}`;
+            document.getElementById('question-text').textContent = activeQuestion.q;
+
+            // Generate Choice Buttons
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            activeQuestion.options.forEach((optText, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full py-2.5 px-3 bg-white hover:bg-amber-50 active:bg-amber-100 text-slate-800 font-bold text-xs sm:text-sm rounded-xl border-2 border-slate-200 shadow-sm text-left transition flex items-center gap-2';
+                
+                const letterBadge = document.createElement('span');
+                letterBadge.className = 'w-6 h-6 rounded-lg bg-amber-400 text-amber-950 font-black text-xs flex items-center justify-center shrink-0';
+                letterBadge.textContent = String.fromCharCode(65 + index); // A, B, C, D
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'flex-1 font-nunito';
+                textSpan.textContent = optText;
+
+                btn.appendChild(letterBadge);
+                btn.appendChild(textSpan);
+
+                btn.onclick = () => handleAnswer(index);
+                container.appendChild(btn);
+            });
+
+            // Show Quiz Modal & Start Timer
+            document.getElementById('quiz-modal').classList.remove('hidden');
+            document.getElementById('quiz-modal').classList.add('flex');
+
+            timeLeft = 6;
+            updateTimerBar();
+
+            clearInterval(quizTimer);
+            quizTimer = setInterval(() => {
+                timeLeft -= 0.1;
+                if (timeLeft <= 0) {
+                    clearInterval(quizTimer);
+                    handleAnswer(-1); // Timeout
+                } else {
+                    updateTimerBar();
+                }
+            }, 100);
+        }
+
+        function updateTimerBar() {
+            const bar = document.getElementById('timer-bar');
+            const percent = (timeLeft / 6) * 100;
+            bar.style.width = `${Math.max(0, percent)}%`;
+            document.getElementById('timer-text').textContent = `⏱️ ${Math.ceil(Math.max(0, timeLeft))}s`;
+        }
+
+        function handleAnswer(selectedIndex) {
+            clearInterval(quizTimer);
+            document.getElementById('quiz-modal').classList.add('hidden');
+            document.getElementById('quiz-modal').classList.remove('flex');
+
+            const isCorrect = (selectedIndex === activeQuestion.answer);
+
+            const feedbackModal = document.getElementById('feedback-modal');
+            const feedbackIcon = document.getElementById('feedback-icon');
+            const feedbackTitle = document.getElementById('feedback-title');
+            const feedbackBody = document.getElementById('feedback-body');
+
+            if (isCorrect) {
+                playSound('correct');
+                score += 10 + Math.floor(timeLeft * 2); // Bonus speed points
+                updateHUD();
+
+                feedbackIcon.textContent = '🌟';
+                feedbackTitle.textContent = 'HEBAT! OPERAN BAGUS!';
+                feedbackTitle.className = 'text-xl sm:text-2xl font-black text-emerald-600';
+                feedbackBody.textContent = activeQuestion.explain;
+                feedbackBody.className = 'bg-emerald-50 border-2 border-emerald-200 p-3.5 rounded-2xl text-xs sm:text-sm text-emerald-900 font-nunito my-auto text-center leading-relaxed';
+
+                // Particle Effect on high points
+                confetti({
+                    particleCount: 30,
+                    spread: 60,
+                    origin: { y: 0.6 }
+                });
+
+            } else {
+                playSound('wrong');
+                lives--;
+                updateHUD();
+
+                feedbackIcon.textContent = '⚽💥';
+                feedbackTitle.textContent = selectedIndex === -1 ? 'WAKTU HABIS! BOLA JATUH!' : 'OPS, BOLA TERJATUH!';
+                feedbackTitle.className = 'text-xl sm:text-2xl font-black text-rose-600';
+                feedbackBody.textContent = activeQuestion.explain;
+                feedbackBody.className = 'bg-rose-50 border-2 border-rose-200 p-3.5 rounded-2xl text-xs sm:text-sm text-rose-900 font-nunito my-auto text-center leading-relaxed';
+            }
+
+            feedbackModal.classList.remove('hidden');
+            feedbackModal.classList.add('flex');
+        }
+
+        function continueGame() {
+            document.getElementById('feedback-modal').classList.add('hidden');
+            document.getElementById('feedback-modal').classList.remove('flex');
+
+            if (lives <= 0) {
+                showGameOver();
+            } else {
+                // Resume Ball Pass Animation
+                playSound('pass');
+                isPassing = true;
+            }
+        }
+
+        function showGameOver() {
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-lap').querySelector('span').textContent = currentLap - 1;
+
+            const gameOverModal = document.getElementById('gameover-modal');
+            gameOverModal.classList.remove('hidden');
+            gameOverModal.classList.add('flex');
+
+            // Celebration confetti for finishing
+            confetti({
+                particleCount: 70,
+                spread: 80,
+                origin: { y: 0.5 }
+            });
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        // Initialize Canvas loop on window load
+        window.onload = function() {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
